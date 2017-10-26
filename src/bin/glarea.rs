@@ -183,7 +183,6 @@ fn main() {
         let (vbo, ebo, vao, prog) = (vbo.clone(), ebo.clone(), vao.clone(), prog.clone());
         gl.connect_realize(move |gl_area| {
                 gl_area.get_context().unwrap().make_current();
-
                 /**
                  * This is a dummy context that we're using to load opengl functions. There
                  * are more elegant solutions than this one, but you must use this method if
