@@ -148,18 +148,28 @@ fn main() {
     let gl = app.get_gl();
 
     let start = SystemTime::now();
+    /**
+     * We need to enclose our gl objects in Arc<Mutex<T>> in order to pass them around to
+     * multiple closures and so each closure can access and mutate the gl objects. 
+     *
+     * Box<T> will NOT work in this situation.
+     */
     let vbo = Arc::new(Mutex::new(0));
     let ebo = Arc::new(Mutex::new(0));
     let vao = Arc::new(Mutex::new(0));
     let prog = Arc::new(Mutex::new(0));
 
     gl.connect_create_context(|gl_area| {
+            /**
+             * Here i get window parent of the `gl_area` and create a gl context for it.
+             * This step is actually not necessary unless you want to request a specific
+             * gl version for the context or if you want to enable debug.
+             */
             let gl_context = match gl_area.get_window().unwrap().create_gl_context() {
                 Ok(context) => context,
                 Err(error) => panic!("{:?}", error),
             };
-            gl_context.set_required_version(3, 3);
-            gl_context.set_debug_enabled(true);
+            gl_context.set_required_version(3, 0);
             gl_context
         });
 
@@ -174,7 +184,31 @@ fn main() {
         gl.connect_realize(move |gl_area| {
                 gl_area.get_context().unwrap().make_current();
 
-                let context = glutin::HeadlessRendererBuilder::new(50, 50)
+                /**
+                 * This is a dummy context that we're using to load opengl functions. There
+                 * are more elegant solutions than this one, but you must use this method if
+                 * you want your software to compile and run on Windows. 
+                 *
+                 * Windows OpenGL function loading works differently than on linux. On linux,
+                 * I can query the system at anytime with a crate like `static_library` and
+                 * it will return all of the OpenGL functions that I request with 
+                 * `gl::load_with()`. Windows OpenGL loading is context based, so you need to
+                 * have a valid context that the system's OpenGL provider will recognize (WGL
+                 * in this case). The `static_library` approach won't work on Windows for this
+                 * reason.
+                 *
+                 * A context must be defined and must also declare which version of OpenGL it
+                 * would like to use. Once this is done, you can query functions from the system
+                 * and load them with `gl::load_with()`. Fortunately, we don't have to have that
+                 * valid WGL context on windows in order to render, we just need some OpenGL
+                 * context to be made current and OpenGL will draw to that. Some once we use
+                 * the Headless Context from glutin to load the OpenGL functions, we can just drop
+                 * it and not have to worry about it.
+                 *
+                 * The downside of this approach is really just the pulling in of a bunch of
+                 * extra dependencies which increases compile time. 
+                 */
+                let context = glutin::HeadlessRendererBuilder::new(0, 0)
                     .with_gl(GlRequest::Specific(Api::OpenGl, (3, 0)))
                     .build_strict()
                     .unwrap();
